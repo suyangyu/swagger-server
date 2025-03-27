@@ -12,3 +12,5 @@ yarn-error.log*
 .vscode/*
 resources/*
 .DS_Store
+static/*
+dist/*

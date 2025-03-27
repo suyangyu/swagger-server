@@ -4,36 +4,48 @@ import redoc from'redoc-express'
 import fs from 'fs'
 import * as yaml from 'yaml'
 import cors from 'cors'
+import { isSupported } from './is-supported'
+import { changeExtensionToHtml } from "./resources";
+import { execSync } from 'child_process'
 
 const port = process.env.PORT || 8000
-
 const app = express()
 
-const supportedFileExtensions = ['yaml', 'yml', 'json']
 
-const isSupported = (fileName: String) =>
-    !!supportedFileExtensions.find(ext => fileName.endsWith(`.${ext}`))
-
-app.get('/', function (req: any, res: any) {
+const indexHtml =  () => {
     const files = fs.readdirSync("resources").reduce((acc: string, fileName: string) =>
             isSupported(fileName) ?
-                `${acc}<li>${fileName} <a href="raw/${fileName}">raw</a> <a href="swagger-ui/${fileName}">swagger ui</a> <a href="redoc/${fileName}">redoc</a></li>
+                `${acc}<li>${fileName} <a href="raw/${fileName}">raw</a> <a href="swagger-ui/${fileName}">swagger ui</a> <a href="redoc/${fileName}">redoc</a> <a href="static-redoc/${changeExtensionToHtml(fileName)}">static redoc</a></li>
 `
                 : acc,
         ''
     )
-    res.setHeader('Content-Type', 'text/html')
-    res.send(`<!DOCTYPE html>
+        return `
+<!DOCTYPE html>
 <html lang="en">
     <head><title>API Index</title></head>
     <body>
         <h1>APIs</h1>
+        <form action="/" method="post">
+            <button onclick="this.innerHTML='Generating please wait...'; this.disabled=true; this.form.submit();">Generate static redocs</button>
+       </form>
         <ul>
             ${files}
         </ul>
     </body>
 </html>
-`)
+`
+}
+
+app.get('/', function (req: any, res: any) {
+    res.setHeader('Content-Type', 'text/html')
+    res.send(indexHtml())
+})
+
+app.post('/', (req: any, res: any)=> {
+    execSync('npm run redoc:static')
+    res.setHeader('Content-Type', 'text/html')
+    res.send(indexHtml())
 })
 
 app.use('/raw/:file', cors(), swaggerUi.serve, (req: any, res: any) => {
@@ -94,6 +106,11 @@ app.get('/redoc/:file',  (req :any, res:any) => {
     })(req, res)
 })
 
+app.use('/static-redoc/:file', cors(), swaggerUi.serve, (req: any, res: any) => {
+    const fileName = req.params.file
+    const file = fs.readFileSync(`static/${fileName}.html`, 'utf8')
+    res.send(file)
+})
 
 app.listen(port, () => {
     console.log(`App listening on port ${port}`)
