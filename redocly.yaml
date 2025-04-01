@@ -1,0 +1,12 @@
+extends:
+  - recommended
+
+theme:
+  openapi:
+    hideDownloadButton: true
+    theme:
+      spacing:
+        sectionVertical: 1
+      typography:
+        headings:
+          lineHeight: "1.2em"

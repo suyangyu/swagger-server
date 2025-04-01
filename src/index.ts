@@ -83,25 +83,17 @@ app.get('/redoc/:file',  (req :any, res:any) => {
                    // you can omit the options object if you don't need it
                    // https://redocly.com/docs/api-reference-docs/configuration/functionality/
         redocOptions: {
-        theme: {
-            colors: {
-                primary: {
-                    main: '#6EC5AB'
+            // https://redocly.com/docs-legacy/api-reference-docs/configuration/theming
+            theme: {
+                spacing: {
+                    sectionVertical: '35px',
+                },
+                typography: {
+                    headings: {
+                        lineHeight: "1.2em"
+                    }
                 }
-            },
-            typography: {
-                fontFamily: `"museo-sans", 'Helvetica Neue', Helvetica, Arial, sans-serif`,
-                    fontSize: '15px',
-                    lineHeight: '1.5',
-                    code: {
-                    code: '#87E8C7',
-                        backgroundColor: '#4D4D4E'
-                }
-            },
-            menu: {
-                backgroundColor: '#ffffff'
             }
-        }
         }
     })(req, res)
 })
