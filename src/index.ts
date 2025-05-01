@@ -11,11 +11,11 @@ import { execSync } from 'child_process'
 const port = process.env.PORT || 8000
 const app = express()
 
-
-const indexHtml =  () => {
-    const files = fs.readdirSync("resources").reduce((acc: string, fileName: string) =>
+const indexHtml =  (folder?: string) => {
+    const maybeFolder = folder? `/${folder}/`: ''
+    const files = fs.readdirSync(`resources${maybeFolder}`).reduce((acc: string, fileName: string) =>
             isSupported(fileName) ?
-                `${acc}<li>${fileName} <a href="raw/${fileName}">raw</a> <a href="swagger-ui/${fileName}">swagger ui</a> <a href="redoc/${fileName}">redoc</a> <a href="static-redoc/${changeExtensionToHtml(fileName)}">static redoc</a></li>
+                `${acc}<li>${fileName} <a href="${maybeFolder}raw/${fileName}">raw</a> <a href="${maybeFolder}swagger-ui/${fileName}">swagger ui</a> <a href="${maybeFolder}redoc/${fileName}">redoc</a> <a href="${maybeFolder}static-redoc/${changeExtensionToHtml(fileName)}">static redoc</a></li>
 `
                 : acc,
         ''
@@ -26,7 +26,7 @@ const indexHtml =  () => {
     <head><title>API Index</title></head>
     <body>
         <h1>APIs</h1>
-        <form action="/" method="post">
+        <form action="/${ folder ? folder : '' }" method="post">
             <button onclick="this.innerHTML='Generating please wait...'; this.disabled=true; this.form.submit();">Generate static redocs</button>
        </form>
         <ul>
@@ -37,20 +37,36 @@ const indexHtml =  () => {
 `
 }
 
-app.get('/', function (req: any, res: any) {
-    res.setHeader('Content-Type', 'text/html')
-    res.send(indexHtml())
-})
+const getIndex = (req: any, res: any) => {
+    const maybeFolder = req.params.folder
 
-app.post('/', (req: any, res: any)=> {
-    execSync('npm run redoc:static')
     res.setHeader('Content-Type', 'text/html')
-    res.send(indexHtml())
-})
+    res.send(indexHtml(maybeFolder))
+}
 
-app.use('/raw/:file', cors(), swaggerUi.serve, (req: any, res: any) => {
+app.get('/', getIndex)
+
+app.get('/:folder', getIndex)
+
+const generateStatic =  (req: any, res: any) => {
+    const maybeFolderName = req.params.folder
+    const folder = maybeFolderName ? `${maybeFolderName}/` : ''
+    const scriptArg = folder ? ` ${folder}`: ''
+
+    execSync(`npm run redoc:static${scriptArg}`)
+    res.setHeader('Content-Type', 'text/html')
+    res.send(indexHtml(folder))
+}
+
+app.post('/', generateStatic)
+
+app.post('/:folder', generateStatic)
+
+const getRawFile = (req: any, res: any) => {
     const fileName = req.params.file
-    const file = fs.readFileSync(`resources/${fileName}`, 'utf8')
+    const maybeFolderName = req.params.folder
+    const folder = maybeFolderName ? `${maybeFolderName}/` : ''
+    const file = fs.readFileSync(`resources/${folder}${fileName}`, 'utf8')
 
     if (fileName.endsWith('.yaml') || fileName.endsWith('.yml')) {
         res.setHeader('Content-Type', 'text/x-yaml')
@@ -60,20 +76,30 @@ app.use('/raw/:file', cors(), swaggerUi.serve, (req: any, res: any) => {
         res.setHeader('Content-Type', 'text/plain')
     }
     res.send(file)
-})
+}
 
-app.use('/swagger-ui/:file', swaggerUi.serve, (req: any, res: any, err: any) => {
+app.use('/raw/:file', cors(), swaggerUi.serve, getRawFile)
+
+app.use('/:folder/raw/:file', cors(), swaggerUi.serve, getRawFile)
+
+const getSwaggerUi =  (req: any, res: any, err: any) => {
     const fileName = req.params.file
-    const file = fs.readFileSync(`resources/${fileName}`, 'utf8')
+    const maybeFolderName = req.params.folder
+    const folder = maybeFolderName ? `${maybeFolderName}/` : ''
+
+    const file = fs.readFileSync(`resources/${folder}${fileName}`, 'utf8')
     const swaggerDocument =
         fileName.endsWith('.yml') || fileName.endsWith('.yaml')
             ? yaml.parse(file)
             : file
     swaggerUi.setup(swaggerDocument)(req, res, err)
-})
+}
 
-// serve your swagger.json file
-app.get('/redoc/:file',  (req :any, res:any) => {
+app.use('/swagger-ui/:file', swaggerUi.serve, getSwaggerUi)
+
+app.use('/:folder/swagger-ui/:file', swaggerUi.serve, getSwaggerUi)
+
+const getDynamicRedoc = (req :any, res:any) => {
     const fileName = req.params.file
     redoc({
         title: 'API Docs',
@@ -96,13 +122,24 @@ app.get('/redoc/:file',  (req :any, res:any) => {
             }
         }
     })(req, res)
-})
+}
 
-app.use('/static-redoc/:file', cors(), swaggerUi.serve, (req: any, res: any) => {
+app.get('/redoc/:file', getDynamicRedoc)
+
+app.get('/:folder/redoc/:file', getDynamicRedoc)
+
+const getStaticRedoc = (req: any, res: any) => {
     const fileName = req.params.file
-    const file = fs.readFileSync(`static/${fileName}.html`, 'utf8')
+    const maybeFolderName = req.params.folder
+    const folder = maybeFolderName ? `${maybeFolderName}/` : ''
+    const file = fs.readFileSync(`static/${folder}${fileName}.html`, 'utf8')
+
     res.send(file)
-})
+}
+
+app.use('/static-redoc/:file', cors(), swaggerUi.serve, getStaticRedoc)
+
+app.use('/:folder/static-redoc/:file', cors(), swaggerUi.serve, getStaticRedoc)
 
 app.listen(port, () => {
     console.log(`App listening on port ${port}`)
