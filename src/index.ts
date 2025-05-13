@@ -12,7 +12,7 @@ const port = process.env.PORT || 8000
 const app = express()
 
 const indexHtml =  (folder?: string) => {
-    const maybeFolder = folder? `/${folder}/`: ''
+    const maybeFolder = folder ? `/${folder}/`: ''
     const files = fs.readdirSync(`resources${maybeFolder}`).reduce((acc: string, fileName: string) =>
             isSupported(fileName) ?
                 `${acc}<li>${fileName} <a href="${maybeFolder}raw/${fileName}">raw</a> <a href="${maybeFolder}swagger-ui/${fileName}">swagger ui</a> <a href="${maybeFolder}redoc/${fileName}">redoc</a> <a href="${maybeFolder}static-redoc/${changeExtensionToHtml(fileName)}">static redoc</a></li>
@@ -40,17 +40,20 @@ const indexHtml =  (folder?: string) => {
 const getIndex = (req: any, res: any) => {
     const maybeFolder = req.params.folder
 
-    res.setHeader('Content-Type', 'text/html')
-    res.send(indexHtml(maybeFolder))
+    if (maybeFolder?.match(/\/$/)) {
+        res.redirect('/'+maybeFolder.replace(/\/$/,''))
+    } else {
+        res.setHeader('Content-Type', 'text/html')
+        res.send(indexHtml(maybeFolder))
+    }
 }
 
 app.get('/', getIndex)
 
-app.get('/:folder', getIndex)
 
 const generateStatic =  (req: any, res: any) => {
-    const maybeFolderName = req.params.folder
-    const folder = maybeFolderName ? `${maybeFolderName}/` : ''
+    const maybeFolderName = req.params.folder?.replace(/\/$/,'')
+    const folder = maybeFolderName ? maybeFolderName : ''
     const scriptArg = folder ? ` ${folder}`: ''
 
     execSync(`npm run redoc:static${scriptArg}`)
@@ -60,11 +63,9 @@ const generateStatic =  (req: any, res: any) => {
 
 app.post('/', generateStatic)
 
-app.post('/:folder', generateStatic)
-
 const getRawFile = (req: any, res: any) => {
     const fileName = req.params.file
-    const maybeFolderName = req.params.folder
+    const maybeFolderName = req.params.folder?.replace(/\/$/,'')
     const folder = maybeFolderName ? `${maybeFolderName}/` : ''
     const file = fs.readFileSync(`resources/${folder}${fileName}`, 'utf8')
 
@@ -80,11 +81,11 @@ const getRawFile = (req: any, res: any) => {
 
 app.use('/raw/:file', cors(), swaggerUi.serve, getRawFile)
 
-app.use('/:folder/raw/:file', cors(), swaggerUi.serve, getRawFile)
+app.use('/:folder(.*)/raw/:file', cors(), swaggerUi.serve, getRawFile)
 
 const getSwaggerUi =  (req: any, res: any, err: any) => {
     const fileName = req.params.file
-    const maybeFolderName = req.params.folder
+    const maybeFolderName = req.params.folder?.replace(/\/$/,'')
     const folder = maybeFolderName ? `${maybeFolderName}/` : ''
 
     const file = fs.readFileSync(`resources/${folder}${fileName}`, 'utf8')
@@ -97,7 +98,7 @@ const getSwaggerUi =  (req: any, res: any, err: any) => {
 
 app.use('/swagger-ui/:file', swaggerUi.serve, getSwaggerUi)
 
-app.use('/:folder/swagger-ui/:file', swaggerUi.serve, getSwaggerUi)
+app.use('/:folder(.*)/swagger-ui/:file', swaggerUi.serve, getSwaggerUi)
 
 const getDynamicRedoc = (req :any, res:any) => {
     const fileName = req.params.file
@@ -126,11 +127,11 @@ const getDynamicRedoc = (req :any, res:any) => {
 
 app.get('/redoc/:file', getDynamicRedoc)
 
-app.get('/:folder/redoc/:file', getDynamicRedoc)
+app.get('/:folder(.*)/redoc/:file', getDynamicRedoc)
 
 const getStaticRedoc = (req: any, res: any) => {
     const fileName = req.params.file
-    const maybeFolderName = req.params.folder
+    const maybeFolderName = req.params.folder?.replace(/\/$/,'')
     const folder = maybeFolderName ? `${maybeFolderName}/` : ''
     const file = fs.readFileSync(`static/${folder}${fileName}.html`, 'utf8')
 
@@ -139,7 +140,12 @@ const getStaticRedoc = (req: any, res: any) => {
 
 app.use('/static-redoc/:file', cors(), swaggerUi.serve, getStaticRedoc)
 
-app.use('/:folder/static-redoc/:file', cors(), swaggerUi.serve, getStaticRedoc)
+app.use('/:folder(.*)/static-redoc/:file', cors(), swaggerUi.serve, getStaticRedoc)
+
+
+app.get('/:folder(.*)', getIndex)
+
+app.post('/:folder(.*)', generateStatic)
 
 app.listen(port, () => {
     console.log(`App listening on port ${port}`)
